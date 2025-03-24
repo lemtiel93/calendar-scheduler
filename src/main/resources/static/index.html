@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Calendario Prenotazioni</title>
+  <style>
+    .day-card {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin: 10px;
+      display: inline-block;
+      vertical-align: top;
+      width: 250px;
+    }
+    .slot {
+      margin: 5px 0;
+      padding: 3px;
+      border-bottom: 1px solid #eee;
+    }
+    button, select {
+      margin-top: 5px;
+    }
+    form {
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Calendario Prenotazioni</h1>
+  
+  <label for="inputDate">Inserisci una data:</label>
+  <input type="date" id="inputDate" />
+  <button onclick="loadWeek()">Visualizza settimana</button>
+  
+  <div id="weekContainer"></div>
+  
+  <script>
+    // URL base per le API
+    const calendarBaseUrl = "http://localhost:8080/api/calendar";
+    const appointmentsUrl = "http://localhost:8080/api/calendar/appointments";
+
+    // Funzione per caricare la settimana relativa alla data selezionata
+    function loadWeek() {
+      const inputDate = document.getElementById("inputDate").value;
+      if (!inputDate) {
+        alert("Inserisci una data!");
+        return;
+      }
+      // Chiamata all'endpoint per ottenere la settimana (DaySlotsDTO)
+      fetch(`${calendarBaseUrl}/slots?day=${inputDate}`)
+        .then(response => response.json())
+        .then(data => renderWeek(data))
+        .catch(err => console.error("Errore nel caricamento della settimana:", err));
+    }
+    
+    // Renderizza la settimana: per ogni giorno (DaySlotsDTO) crea una "card"
+    function renderWeek(weekData) {
+      const container = document.getElementById("weekContainer");
+      container.innerHTML = "";
+      
+      weekData.forEach(day => {
+        const dayCard = document.createElement("div");
+        dayCard.className = "day-card";
+        
+        // Data e stato del giorno
+        const dateElem = document.createElement("h3");
+        dateElem.textContent = day.date;
+        dayCard.appendChild(dateElem);
+        
+        const statusElem = document.createElement("p");
+        statusElem.textContent = day.open ? "Aperto" : "Chiuso";
+        dayCard.appendChild(statusElem);
+        
+        // Pulsante per cambiare lo stato del giorno
+        const toggleButton = document.createElement("button");
+        toggleButton.textContent = "Cambia Stato";
+        toggleButton.onclick = () => toggleStatus(day.date);
+        dayCard.appendChild(toggleButton);
+        
+        // Lista degli slot per il giorno
+        day.slots.forEach(slot => {
+          const slotDiv = document.createElement("div");
+          slotDiv.className = "slot";
+          
+          // Visualizza l'orario e il numero di account disponibili
+          const slotInfo = document.createElement("span");
+          slotInfo.textContent = slot.timeSlot + " - " + slot.availableCount + " account disponibili";
+          slotDiv.appendChild(slotInfo);
+          
+          // Se il giorno è aperto e ci sono account disponibili, mostra il form di prenotazione
+          if (day.open && slot.availableCount > 0) {
+            const form = document.createElement("form");
+            form.onsubmit = event => {
+              event.preventDefault();
+              // Recupera l'account selezionato
+              const zoomAccountId = form.zoomAccountSelect.value;
+              bookSlot(day.date, slot.timeSlot, zoomAccountId);
+            };
+            
+            // Crea il menu a tendina per scegliere l'account Zoom
+            const select = document.createElement("select");
+            select.name = "zoomAccountSelect";
+            slot.zoomAccounts.forEach(acc => {
+              const option = document.createElement("option");
+              option.value = acc.id;
+              option.textContent = acc.email;
+              select.appendChild(option);
+            });
+            form.appendChild(select);
+            
+            // Pulsante per inviare la prenotazione
+            const submitButton = document.createElement("button");
+            submitButton.textContent = "Prenota";
+            form.appendChild(submitButton);
+            
+            slotDiv.appendChild(form);
+          }
+          
+          dayCard.appendChild(slotDiv);
+        });
+        
+        container.appendChild(dayCard);
+      });
+    }
+    
+    // Funzione per cambiare lo stato del giorno
+    function toggleStatus(date) {
+      // Chiamata all'endpoint PUT per toggle
+      fetch(`${calendarBaseUrl}/days/status?date=${date}`, { method: "PUT" })
+        .then(() => loadWeek())
+        .catch(err => console.error("Errore nel cambio stato:", err));
+    }
+    
+    // Funzione per prenotare uno slot
+    function bookSlot(date, timeSlot, zoomAccountId) {
+      // Estrae l'orario d'inizio dallo slot (assume il formato "HH:mm - HH:mm")
+      const startTime = timeSlot.split(" - ")[0].trim();
+      // Costruisce il timestamp ISO (assumendo che il fuso orario locale vada bene)
+      const scheduledTime = `${date}T${startTime}:00`;
+      
+      // Crea l'oggetto appointment con l'account Zoom annidato
+      const appointment = {
+        title: "Prenotazione automatica",
+        scheduledTime: scheduledTime,
+        zoomAccount: {
+          id: parseInt(zoomAccountId, 10)
+        }
+      };
+      
+      fetch(appointmentsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(appointment)
+      })
+      .then(response => {
+        if (response.ok) {
+          alert("Prenotazione effettuata!");
+          loadWeek();
+        } else {
+          alert("Errore nella prenotazione");
+        }
+      })
+      .catch(err => console.error("Errore nella prenotazione:", err));
+    }
+
+      fetch(appointmentsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(appointment)
+      })
+      .then(response => {
+        if (response.ok) {
+          alert("Prenotazione effettuata!");
+          loadWeek();
+        } else {
+          alert("Errore nella prenotazione");
+        }
+      })
+      .catch(err => console.error("Errore nella prenotazione:", err));
+    
+  </script>
+</body>
+</html>
