@@ -122,5 +122,4 @@ http://localhost:8080
   docker-compose down -v
   ```
 - Personalizza porte e variabili d’ambiente secondo le necessità del tuo ambiente.
-- Mantieni sempre aggiornato il file `.env.example` come riferimento per gli altri sviluppatori.
 
